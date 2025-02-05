@@ -42,9 +42,9 @@ extern crate alloc;
 
 use smallvec::smallvec;
 use sp_runtime::{
-    create_runtime_str, generic, impl_opaque_keys,
+    generic, impl_opaque_keys,
     traits::{BlakeTwo256, IdentifyAccount, Verify},
-    MultiSignature,
+    Cow, MultiSignature,
 };
 
 use sp_std::prelude::*;
@@ -101,7 +101,7 @@ pub type BlockId = generic::BlockId<Block>;
 
 /// The SignedExtension to the basic transaction logic.
 #[docify::export(template_signed_extra)]
-pub type SignedExtra = (
+pub type TxExtension = (
     frame_system::CheckNonZeroSender<Runtime>,
     frame_system::CheckSpecVersion<Runtime>,
     frame_system::CheckTxVersion<Runtime>,
@@ -116,7 +116,7 @@ pub type SignedExtra = (
 
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic =
-    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, TxExtension>;
 
 /// Migrations to apply on runtime upgrade.
 pub type Migrations = pallet_xcm::migration::MigrateToLatestXcmVersion<Runtime>;
@@ -188,14 +188,14 @@ impl_opaque_keys! {
 
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-    spec_name: create_runtime_str!("parachain-template-runtime"),
-    impl_name: create_runtime_str!("parachain-template-runtime"),
+    spec_name: Cow::Borrowed("parachain-template-runtime"),
+    impl_name: Cow::Borrowed("parachain-template-runtime"),
     authoring_version: 1,
     spec_version: 1,
     impl_version: 0,
     apis: apis::RUNTIME_API_VERSIONS,
     transaction_version: 1,
-    state_version: 1,
+    system_version: 1,
 };
 
 /// This determines the average expected block time that we are targeting.
@@ -257,8 +257,6 @@ const CONTRACTS_DEBUG_OUTPUT: pallet_contracts::DebugInfo =
     pallet_contracts::DebugInfo::UnsafeDebug;
 const CONTRACTS_EVENTS: pallet_contracts::CollectEvents =
     pallet_contracts::CollectEvents::UnsafeCollect;
-const REVIVE_DEBUG_OUTPUT: pallet_revive::DebugInfo = pallet_revive::DebugInfo::UnsafeDebug;
-const REVIVE_EVENTS: pallet_revive::CollectEvents = pallet_revive::CollectEvents::UnsafeCollect;
 /// Aura consensus hook
 type ConsensusHook = cumulus_pallet_aura_ext::FixedVelocityConsensusHook<
     Runtime,
@@ -338,10 +336,6 @@ mod runtime {
     // Contracts
     #[runtime::pallet_index(40)]
     pub type Contracts = pallet_contracts::Pallet<Runtime>;
-
-    // Revive
-    #[runtime::pallet_index(41)]
-    pub type Revive = pallet_revive::Pallet<Runtime>;
 }
 
 cumulus_pallet_parachain_system::register_validate_block! {
