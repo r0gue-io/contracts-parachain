@@ -42,9 +42,9 @@ extern crate alloc;
 
 use smallvec::smallvec;
 use sp_runtime::{
-    create_runtime_str, generic, impl_opaque_keys,
+    generic, impl_opaque_keys,
     traits::{BlakeTwo256, IdentifyAccount, Verify},
-    MultiSignature,
+    Cow, MultiSignature,
 };
 
 use sp_std::prelude::*;
@@ -57,6 +57,7 @@ use frame_support::weights::{
     WeightToFeePolynomial,
 };
 pub use pallet_balances::Call as BalancesCall;
+use pallet_revive::evm::runtime::EthExtra;
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 pub use sp_runtime::{MultiAddress, Perbill, Permill};
 
@@ -101,12 +102,12 @@ pub type BlockId = generic::BlockId<Block>;
 
 /// The SignedExtension to the basic transaction logic.
 #[docify::export(template_signed_extra)]
-pub type SignedExtra = (
+pub type TxExtension = (
     frame_system::CheckNonZeroSender<Runtime>,
     frame_system::CheckSpecVersion<Runtime>,
     frame_system::CheckTxVersion<Runtime>,
     frame_system::CheckGenesis<Runtime>,
-    frame_system::CheckEra<Runtime>,
+    frame_system::CheckMortality<Runtime>,
     frame_system::CheckNonce<Runtime>,
     frame_system::CheckWeight<Runtime>,
     pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
@@ -116,7 +117,7 @@ pub type SignedExtra = (
 
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic =
-    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, TxExtension>;
 
 /// Migrations to apply on runtime upgrade.
 pub type Migrations = pallet_xcm::migration::MigrateToLatestXcmVersion<Runtime>;
@@ -186,16 +187,41 @@ impl_opaque_keys! {
     }
 }
 
+/// Default extensions applied to Ethereum transactions.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct EthExtraImpl;
+
+impl EthExtra for EthExtraImpl {
+    type Config = Runtime;
+    type Extension = TxExtension;
+
+    fn get_eth_extension(nonce: u32, tip: Balance) -> Self::Extension {
+        (
+            frame_system::CheckNonZeroSender::<Runtime>::new(),
+            frame_system::CheckSpecVersion::<Runtime>::new(),
+            frame_system::CheckTxVersion::<Runtime>::new(),
+            frame_system::CheckGenesis::<Runtime>::new(),
+            frame_system::CheckMortality::from(generic::Era::Immortal),
+            frame_system::CheckNonce::<Runtime>::from(nonce),
+            frame_system::CheckWeight::<Runtime>::new(),
+            pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+            cumulus_primitives_storage_weight_reclaim::StorageWeightReclaim::<Runtime>::new(),
+            frame_metadata_hash_extension::CheckMetadataHash::<Runtime>::new(false),
+        )
+            .into()
+    }
+}
+
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-    spec_name: create_runtime_str!("parachain-template-runtime"),
-    impl_name: create_runtime_str!("parachain-template-runtime"),
+    spec_name: Cow::Borrowed("parachain-template-runtime"),
+    impl_name: Cow::Borrowed("parachain-template-runtime"),
     authoring_version: 1,
     spec_version: 1,
     impl_version: 0,
     apis: apis::RUNTIME_API_VERSIONS,
     transaction_version: 1,
-    state_version: 1,
+    system_version: 1,
 };
 
 /// This determines the average expected block time that we are targeting.
