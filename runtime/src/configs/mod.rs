@@ -208,6 +208,7 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
     type CheckAssociatedRelayNumber = RelayNumberMonotonicallyIncreases;
     type ConsensusHook = ConsensusHook;
     type SelectCore = cumulus_pallet_parachain_system::DefaultCoreSelector<Runtime>;
+    type RelayParentOffset = ConstU32<0>;
 }
 
 impl parachain_info::Config for Runtime {}
@@ -252,10 +253,10 @@ impl cumulus_pallet_xcmp_queue::Config for Runtime {
     type ControllerOriginConverter = XcmOriginToTransactDispatchOrigin;
     type WeightInfo = (); // Configure based on benchmarking results.
     type PriceForSiblingDelivery = NoPriceForMessageDelivery<ParaId>;
-    // Limit the number of messages and signals a HRMP channel can have at most
+    // Limit the number of messages and signals a HRML channel can have at most
     type MaxActiveOutboundChannels = ConstU32<128>;
-    // Limit the number of HRMP channels
-    type MaxPageSize = ConstU32<{ 103 * 1024 }>;
+    // Limit the number of HRML channels
+    type MaxPageSize = ConstU32<{ 1 << 16 }>;
 }
 
 parameter_types! {
