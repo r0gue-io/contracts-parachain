@@ -23,9 +23,7 @@
 //
 // For more information, please refer to <http://unlicense.org>
 
-// External crates imports
 use alloc::{vec, vec::Vec};
-
 use polkadot_sdk::{
 	cumulus_primitives_aura, cumulus_primitives_core, frame_support,
 	frame_support::{
@@ -34,8 +32,8 @@ use polkadot_sdk::{
 	},
 	frame_system, frame_system_rpc_runtime_api,
 	pallet_aura::Authorities,
-	pallet_revive, pallet_transaction_payment, pallet_transaction_payment_rpc_runtime_api, sp_api,
-	sp_api::impl_runtime_apis,
+	pallet_revive, pallet_transaction_payment, pallet_transaction_payment_rpc_runtime_api,
+	sp_api::{self, impl_runtime_apis},
 	sp_block_builder, sp_consensus_aura,
 	sp_consensus_aura::sr25519::AuthorityId as AuraId,
 	sp_core::{crypto::KeyTypeId, OpaqueMetadata},
@@ -49,21 +47,24 @@ use polkadot_sdk::{
 	sp_version::RuntimeVersion,
 };
 
-// Local module imports
-use super::{
-	configs::RuntimeBlockWeights, AccountId, Balance, Block, BlockNumber, ConsensusHook, Contracts,
-	EthExtraImpl, Executive, Hash, InherentDataExt, Nonce, ParachainSystem, Runtime, RuntimeCall,
-	RuntimeGenesisConfig, SessionKeys, System, TransactionPayment, CONTRACTS_DEBUG_OUTPUT,
-	CONTRACTS_EVENTS, SLOT_DURATION, VERSION,
+#[cfg(feature = "try-runtime")]
+use polkadot_sdk::frame_try_runtime;
+
+#[cfg(feature = "runtime-benchmarks")]
+use polkadot_sdk::{
+	cumulus_pallet_session_benchmarking, frame_benchmarking, frame_system_benchmarking,
 };
 
-type EventRecord = frame_system::EventRecord<
-	<Runtime as frame_system::Config>::RuntimeEvent,
-	<Runtime as frame_system::Config>::Hash,
->;
+// Local module imports
+use super::{
+	AccountId, Balance, Block, BlockNumber, ConsensusHook, Executive, InherentDataExt, Nonce,
+	ParachainSystem, Runtime, RuntimeCall, RuntimeGenesisConfig, SessionKeys, System,
+	TransactionPayment, SLOT_DURATION, VERSION,
+};
 
-pallet_revive::impl_runtime_apis_plus_revive!(
+pallet_revive::impl_runtime_apis_plus_revive_traits!(
 	Runtime,
+	Revive,
 	Executive,
 	EthExtraImpl,
 
@@ -91,7 +92,7 @@ pallet_revive::impl_runtime_apis_plus_revive!(
 			VERSION
 		}
 
-		fn execute_block(block: Block) {
+		fn execute_block(block: <Block as BlockT>::LazyBlock) {
 			Executive::execute_block(block)
 		}
 
@@ -137,7 +138,7 @@ pallet_revive::impl_runtime_apis_plus_revive!(
 		}
 
 		fn check_inherents(
-			block: Block,
+			block: <Block as BlockT>::LazyBlock,
 			data: sp_inherents::InherentData,
 		) -> sp_inherents::CheckInherentsResult {
 			data.check_extrinsics(&block)
@@ -229,8 +230,8 @@ pallet_revive::impl_runtime_apis_plus_revive!(
 	}
 
 	#[cfg(feature = "try-runtime")]
-	impl polkadot_sdk::frame_try_runtime::TryRuntime<Block> for Runtime {
-		fn on_runtime_upgrade(checks: polkadot_sdk::frame_try_runtime::UpgradeCheckSelect) -> (Weight, Weight) {
+	impl frame_try_runtime::TryRuntime<Block> for Runtime {
+		fn on_runtime_upgrade(checks: frame_try_runtime::UpgradeCheckSelect) -> (Weight, Weight) {
 			use super::configs::RuntimeBlockWeights;
 
 			let weight = Executive::try_runtime_upgrade(checks).unwrap();
@@ -238,10 +239,10 @@ pallet_revive::impl_runtime_apis_plus_revive!(
 		}
 
 		fn execute_block(
-			block: Block,
+			block: <Block as BlockT>::LazyBlock,
 			state_root_check: bool,
 			signature_check: bool,
-			select: polkadot_sdk::frame_try_runtime::TryStateSelect,
+			select: frame_try_runtime::TryStateSelect,
 		) -> Weight {
 			// NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to
 			// have a backtrace here.
@@ -250,15 +251,15 @@ pallet_revive::impl_runtime_apis_plus_revive!(
 	}
 
 	#[cfg(feature = "runtime-benchmarks")]
-	impl polkadot_sdk::frame_benchmarking::Benchmark<Block> for Runtime {
+	impl frame_benchmarking::Benchmark<Block> for Runtime {
 		fn benchmark_metadata(extra: bool) -> (
-			Vec<polkadot_sdk::frame_benchmarking::BenchmarkList>,
+			Vec<frame_benchmarking::BenchmarkList>,
 			Vec<frame_support::traits::StorageInfo>,
 		) {
-			use polkadot_sdk::frame_benchmarking::BenchmarkList;
+			use frame_benchmarking::BenchmarkList;
 			use frame_support::traits::StorageInfoTrait;
-			use polkadot_sdk::frame_system_benchmarking::Pallet as SystemBench;
-			use polkadot_sdk::cumulus_pallet_session_benchmarking::Pallet as SessionBench;
+			use frame_system_benchmarking::Pallet as SystemBench;
+			use cumulus_pallet_session_benchmarking::Pallet as SessionBench;
 			use super::*;
 
 			let mut list = Vec::<BenchmarkList>::new();
@@ -270,13 +271,13 @@ pallet_revive::impl_runtime_apis_plus_revive!(
 
 		#[allow(non_local_definitions)]
 		fn dispatch_benchmark(
-			config: polkadot_sdk::frame_benchmarking::BenchmarkConfig
-		) -> Result<Vec<polkadot_sdk::frame_benchmarking::BenchmarkBatch>, alloc::string::String> {
-			use polkadot_sdk::frame_benchmarking::{BenchmarkError, BenchmarkBatch};
+			config: frame_benchmarking::BenchmarkConfig
+		) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, alloc::string::String> {
+			use frame_benchmarking::{BenchmarkError, BenchmarkBatch};
 			use super::*;
 
-			use polkadot_sdk::frame_system_benchmarking::Pallet as SystemBench;
-			impl polkadot_sdk::frame_system_benchmarking::Config for Runtime {
+			use frame_system_benchmarking::Pallet as SystemBench;
+			impl frame_system_benchmarking::Config for Runtime {
 				fn setup_set_code_requirements(code: &Vec<u8>) -> Result<(), BenchmarkError> {
 					ParachainSystem::initialize_for_set_code_benchmark(code.len() as u32);
 					Ok(())
@@ -287,8 +288,8 @@ pallet_revive::impl_runtime_apis_plus_revive!(
 				}
 			}
 
-			use polkadot_sdk::cumulus_pallet_session_benchmarking::Pallet as SessionBench;
-			impl polkadot_sdk::cumulus_pallet_session_benchmarking::Config for Runtime {}
+			use cumulus_pallet_session_benchmarking::Pallet as SessionBench;
+			impl cumulus_pallet_session_benchmarking::Config for Runtime {}
 
 			use frame_support::traits::WhitelistedStorageKeys;
 			let whitelist = AllPalletsWithSystem::whitelisted_storage_keys();
