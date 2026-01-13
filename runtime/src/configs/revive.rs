@@ -1,3 +1,7 @@
+use crate::{
+	Address, Balance, Balances, EthExtraImpl, Perbill, Runtime, RuntimeCall, RuntimeEvent,
+	RuntimeHoldReason, RuntimeOrigin, Signature, Timestamp, MILLIUNIT, UNIT,
+};
 use polkadot_sdk::{
 	frame_support::{
 		parameter_types,
@@ -5,11 +9,7 @@ use polkadot_sdk::{
 	},
 	frame_system::EnsureSigned,
 	pallet_authorship, pallet_revive,
-};
-
-use crate::{
-	Balance, Balances, Perbill, Runtime, RuntimeCall, RuntimeEvent, RuntimeHoldReason, Timestamp,
-	TransactionPayment, MILLIUNIT, UNIT,
+	sp_runtime::FixedU128,
 };
 
 // 18 decimals
@@ -26,6 +26,8 @@ parameter_types! {
 	pub const NativeToEthRatio: u32 = (ETH/UNIT) as u32;
 	pub const DepositPerItem: Balance = deposit(1, 0);
 	pub const DepositPerByte: Balance = deposit(0, 1);
+	pub const MaxEthExtrinsicWeight: FixedU128 = FixedU128::from_rational(9, 10);
+	pub const DepositPerChildTrieItem: Balance = deposit(1, 0) / 100;
 }
 
 impl pallet_revive::Config for Runtime {
@@ -37,7 +39,6 @@ impl pallet_revive::Config for Runtime {
 	type Currency = Balances;
 	type DepositPerByte = DepositPerByte;
 	type DepositPerItem = DepositPerItem;
-	type EthGasEncoder = ();
 	type FindAuthor = <Runtime as pallet_authorship::Config>::FindAuthor;
 	type InstantiateOrigin = EnsureSigned<Self::AccountId>;
 	// 1 ETH : 1_000_000 UNIT
@@ -54,9 +55,14 @@ impl pallet_revive::Config for Runtime {
 	type UnsafeUnstableInterface = ConstBool<false>;
 	type UploadOrigin = EnsureSigned<Self::AccountId>;
 	type WeightInfo = pallet_revive::weights::SubstrateWeight<Self>;
-	type WeightPrice = TransactionPayment;
 	type Precompiles = ();
 	type AllowEVMBytecode = ConstBool<false>;
+	type Balance = Balance;
+	type RuntimeOrigin = RuntimeOrigin;
+	type DepositPerChildTrieItem = DepositPerChildTrieItem;
+	type FeeInfo = pallet_revive::evm::fees::Info<Address, Signature, EthExtraImpl>;
+	type MaxEthExtrinsicWeight = MaxEthExtrinsicWeight;
+	type DebugEnabled = ConstBool<false>;
 }
 
 impl TryFrom<RuntimeCall> for pallet_revive::Call<Runtime> {
